@@ -1,1 +1,68 @@
+parameters:
 
+- name: imageACR
+  type: string
+
+- name: serviceConnection
+  type: string
+
+- name: imageRepository
+  type: string
+  
+- name: tags
+  type: string
+
+- name: dockerPushArgs
+  type: string
+  default: ' '
+
+- name: azureTaskType
+  type: string
+  default: "powershell" #cli
+
+steps:
+
+- ${{if eq(parameters.azureTaskType, 'cli')}}:
+
+  - task: AzureCLI@2
+    name: ARMImagePushAcr
+    displayName: "Push Docker Image to Acr"
+    inputs:
+      azureSubscription: '${{ parameters.serviceConnection }}'
+      scriptType: 'pscore'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        try {
+          $registry = "${{ parameters.imageACR }}.azurecr.io"  
+          docker image ls
+          docker image push --all-tags $registry/${{ parameters.imageRepository }} ${{parameters.dockerPushArgs}}
+          if (!$?) {
+              throw "docker push failed for $registry/${{ parameters.imageRepository }}:${{parameters.tags}}"
+          }
+        }
+        catch {
+          throw $_
+        }
+
+- ${{ else }}:
+  - task: AzurePowerShell@5
+    name: ImagePushAcr
+    displayName: "Push Docker Image to Acr"
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      azurePowerShellVersion: latestVersion
+      failOnStandardError: true
+      pwsh: true
+      scriptType: inlineScript
+      inline: |
+        try {
+          $registry = "${{ parameters.imageACR }}.azurecr.io"  
+          docker image ls
+          docker image push --all-tags $registry/${{ parameters.imageRepository }} ${{parameters.dockerPushArgs}}
+          if (!$?) {
+              throw "docker push failed for $registry/${{ parameters.imageRepository }}:${{parameters.tags}}"
+          }
+        }
+        catch {
+          throw $_
+        }
